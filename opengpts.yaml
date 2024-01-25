@@ -1,0 +1,182 @@
+---
+namespace: opengpts
+
+redis:
+  defines: runnable
+  containers:
+    redis:
+      image: redis/redis-stack-server
+      image-tag: latest
+      ports:
+        - <- `${port}:${port}`
+      paths:
+        - <- `${monk-volume-path}/opengpts/redis:/data`
+  variables:
+      port:
+          type: int
+          value: 6379
+          env: REDIS_PORT
+  services:
+    redis:
+      container: redis
+      port: <- `${port}`
+      protocol: tcp
+
+backend:
+  defines: runnable
+  containers:
+    backend:
+      image: gcr.io/monk-releases/opengpts-backend:latest
+      image-tag: latest
+      ports:
+        - <- `${port}:${port}`
+  variables:
+    port:
+        type: int
+        value: 8000
+        env: BACKEND_PORT
+    openai-api-key:
+        type: string
+        env: OPENAI_API_KEY
+    langchain-tracing-v2:
+        type: bool
+        value: true
+        env: LANGCHAIN_TRACING_V2
+    langchain-project:
+        type: string
+        env: LANGCHAIN_PROJECT
+    langchain-api-key:
+        type: string
+        env: LANGCHAIN_API_KEY
+    redis-host:
+        type: string
+        value: <- connection-hostname("redis")
+        env: REDIS_HOST
+    redis-port:
+        type: string
+        value: <- connection-port("redis")
+        env: REDIS_PORT
+    redis-url:
+        type: string
+        value: <- `redis://${redis-host}:${redis-port}`
+        env: REDIS_URL
+    tamily-api-key:
+        type: string
+        env: TAVILY_API_KEY
+    fireworks-api-key:
+        type: string
+        env: FIREWORKS_API_KEY
+    ydc-api-key:
+        type: string
+        env: YDC_API_KEY
+    aws-access-key-id:
+        type: string
+        env: AWS_ACCESS_KEY_ID
+    aws-secret-access-key:
+        type: string
+        env: AWS_SECRET_ACCESS_KEY
+    azure-openai-deployment-name:
+        type: string
+        env: AZURE_OPENAI_DEPLOYMENT_NAME
+    azure-openai-api-base:
+        type: string
+        env: AZURE_OPENAI_API_BASE
+    azure-openai-api-version:
+        type: string
+        env: AZURE_OPENAI_API_VERSION
+    azure-openai-api-key:
+        type: string
+        env: AZURE_OPENAI_API_KEY
+    kay-api-key:
+        type: string
+        env: KAY_API_KEY
+  services:
+    backend:
+      container: backend
+      port: <- `${port}`
+      protocol: tcp
+  connections:
+    redis:
+      runnable: opengpts/redis
+      service: redis
+  depends:
+    wait-for:
+      runnables:
+        - opengpts/redis
+      timeout: 60
+
+
+frontend:
+  defines: runnable
+  containers:
+      frontend:
+        image: gcr.io/monk-releases/opengpts-frontend:latest
+        image-tag: latest
+        bash: <- `yarn dev 0.0.0.0`
+        ports:
+            - <- `${port}:${port}`
+  variables:
+      port:
+        type: int
+        value: 5173
+        env: FRONTEND_PORT
+      backend-host:
+        type: string
+        value: <- connection-hostname("backend")
+        env: BACKEND_HOST
+      backend-port:
+        type: string
+        value: <- connection-port("backend")
+        env: BACKEND_PORT
+      vitabackend-url:
+        type: string
+        value: <- `http://${backend-host}:${backend-port}`
+        env: VITE_BACKEND_URL
+  services:
+    frontend:
+      container: frontend
+      port: <- `${port}`
+      protocol: tcp
+      host-port: <- `${port}`
+      # publish: true
+  connections:
+    backend:
+      runnable: opengpts/backend
+      service: backend
+
+
+stack:
+  defines: process-group
+  balancers:
+    opengpts:
+      type: HTTPS
+      port: <- service-port("opengpts/frontend","frontend")
+      frontend-port: 80
+      instances:
+        - opengpts/frontend
+      health-check:
+        kind: TCP
+        url: /
+        interval: 5
+        request: ''
+        response: ''
+      tls-certificate: <- secret("monk-domain-cert")
+      tls-key: <- secret("monk-domain-key")
+      tls-chain: <- secret("monk-domain-chain") default("")
+  metadata:
+    name: OpenGPTs
+    shortname: OpenGPTs
+    description: |
+      This is an open source effort to create a similar experience to OpenAI's GPTs and Assistants API. 
+      It builds upon LangChain, LangServe and LangSmith.
+    source: https://github.com/langchain-ai/opengpts
+    tags: LLM, AI, open source
+    publisher: monk.io
+  runnable-list:
+    - opengpts/redis
+    - opengpts/backend
+    - opengpts/frontend
+  permitted-secrets:
+    monk-domain-cert: true
+    monk-domain-key: true
+    monk-domain-chain: true
