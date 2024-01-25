@@ -19,15 +19,24 @@ git clone https://github.com/monk-io/monk-opengpts
 
 ## Make public
 
-Basically you could just uncomment `publish:true` but openGPTs requires https to work correctly
+OpenGPTs requires https to work correctly, so you need to have HTTPS balancer section in your template or configure it in another way
 ```
-  services:
-    frontend:
-      container: frontend
-      port: <- `${port}`
-      protocol: tcp
-      host-port: <- `${port}`
-      # publish: true  <-- uncomment here or setup frontend proxy
+balancers:
+    opengpts:
+      type: HTTPS
+      port: <- service-port("opengpts/frontend","frontend")
+      frontend-port: 80
+      instances:
+        - opengpts/frontend
+      health-check:
+        kind: TCP
+        url: /
+        interval: 5
+        request: ''
+        response: ''
+      tls-certificate: <- secret("monk-domain-cert")
+      tls-key: <- secret("monk-domain-key")
+      tls-chain: <- secret("monk-domain-chain") default("")
 ```
 
 

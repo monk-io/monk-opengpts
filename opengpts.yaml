@@ -5,7 +5,7 @@ redis:
   defines: runnable
   containers:
     redis:
-      image: redis
+      image: redis/redis-stack-server
       image-tag: latest
       ports:
         - <- `${port}:${port}`
@@ -58,7 +58,7 @@ backend:
         env: REDIS_PORT
     redis-url:
         type: string
-        value: redis://${redis-host}:${redis-port}
+        value: <- `redis://${redis-host}:${redis-port}`
         env: REDIS_URL
     tamily-api-key:
         type: string
@@ -147,6 +147,22 @@ frontend:
 
 stack:
   defines: process-group
+  balancers:
+    opengpts:
+      type: HTTPS
+      port: <- service-port("opengpts/frontend","frontend")
+      frontend-port: 80
+      instances:
+        - opengpts/frontend
+      health-check:
+        kind: TCP
+        url: /
+        interval: 5
+        request: ''
+        response: ''
+      tls-certificate: <- secret("monk-domain-cert")
+      tls-key: <- secret("monk-domain-key")
+      tls-chain: <- secret("monk-domain-chain") default("")
   metadata:
     name: OpenGPTs
     shortname: OpenGPTs
@@ -160,3 +176,7 @@ stack:
     - opengpts/redis
     - opengpts/backend
     - opengpts/frontend
+  permitted-secrets:
+    monk-domain-cert: true
+    monk-domain-key: true
+    monk-domain-chain: true
