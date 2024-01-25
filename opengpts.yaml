@@ -130,8 +130,8 @@ frontend:
         env: BACKEND_PORT
       vitabackend-url:
         type: string
-        value: http://${backend-host}:${backend-port}
-        env: VITABACKEND_URL
+        value: <- `http://${backend-host}:${backend-port}`
+        env: VITE_BACKEND_URL
   services:
     frontend:
       container: frontend
