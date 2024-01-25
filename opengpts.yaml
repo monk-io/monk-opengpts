@@ -172,6 +172,7 @@ stack:
     source: https://github.com/langchain-ai/opengpts
     tags: LLM, AI, open source
     publisher: monk.io
+    icon: https://avatars.githubusercontent.com/u/126733545
   runnable-list:
     - opengpts/redis
     - opengpts/backend
